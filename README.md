@@ -1,16 +1,29 @@
-# Factorio YOLO v0 Playground
+# 2D Game Playing AI Playground(WIP)
 
-This is a playground for the [Factorio YOLO v0](../../models/factorio-yolo-v0/README.md) model.
+This is a playground for some models that can play 2D games.
 
 - Deployed on HuggingFace space.
 - Powered by [ONNX](https://onnx.ai/) runtime.
 
 ## Usage
 
-- Upload a square image to detect objects in the image.
-- Connect to your VNC server to play Factorio and detect objects in real-time.
+- Upload a image[^1] to detect objects in the image.
+- Connect to your VNC server to play games and detect objects in real-time.
 
-### Run Factorio Client in Docker
+[^1]: Square image is required when using Factorio YOLO v0 model.
+
+There are some methods to run object detection model in real-time.
+
+- Run game client in Docker
+- TODO: Capture game screen
+- TODO: Upload video file
+
+### Run Game Client in Docker
+
+Please follow the instructions below to run game client in Docker.
+
+<details>
+<summary>Factorio</summary>
 
 Because of the license of Factorio, we cannot provide pre-built Factorio docker image, you need to build it yourself.
 
@@ -34,5 +47,7 @@ docker run -it -p 5900:5900 -p 5901:5901 factorio-gui
 ```
 
 After that, you can visit `http://localhost:5901/vnc.html` to play Factorio.
+</details>
 
-For object detection, you need to type `ws://localhost:5901/websockify` in the `WebSocket URL` field, and then click `Connect`, after connected, you can play Factorio and view detection result in real-time.
+
+You need to type `ws://localhost:5901/websockify` in the `WebSocket URL` field, and then click `Connect`, after connected, you can play the game and view detection result in real-time.
