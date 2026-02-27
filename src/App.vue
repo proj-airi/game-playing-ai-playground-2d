@@ -28,6 +28,13 @@ const names = ref([
   'express-transport-belt',
 ])
 
+const detectionModels = [
+  {
+    label: 'Factorio YOLO v0 (Hugging Face)',
+    url: 'https://huggingface.co/proj-airi/factorio-yolo-v0/resolve/main/results/weights/best.onnx?download=true',
+  },
+] as const
+
 const objectDetectionContext = createContext(new DetectWorker()).context
 const detectObject = defineInvoke(objectDetectionContext, objectDetectionInvoke)
 
@@ -70,6 +77,7 @@ function useFps() {
 const { fps, updateFps } = useFps()
 
 const tab = useLocalStorage('factorio-yolo-v0-playground/current-tab', 'image')
+const selectedDetectionModel = useLocalStorage('factorio-yolo-v0-playground/detection-model-url', detectionModels[0].url)
 const vncAddress = useLocalStorage('factorio-yolo-v0-playground/vnc-address', 'ws://localhost:5901/websockify')
 const vncView = useTemplateRef<HTMLDivElement>('vncView')
 const vncClient = ref<NoVncClient | null>(null)
@@ -140,7 +148,7 @@ async function detectBlob(blob: Blob) {
   imgCtx.drawImage(imageEl, dx, dy, newWidth, newHeight)
 
   const imageData = imgCtx.getImageData(dx, dy, modelSize.value, modelSize.value)
-  detectWorkerInstance.postMessage({ imageData })
+  detectWorkerInstance.postMessage({ imageData, modelUrl: selectedDetectionModel.value })
 }
 
 async function onFileChange(file: File) {
@@ -230,7 +238,10 @@ const getVncFrameAndDetect = invokeWithAnimationFrame(
     }
 
     const imageData = ctx.getImageData(0, 0, vncCanvas.value.width, vncCanvas.value.height)
-    const { detections, _transfer } = await detectObject(imageData.data.buffer, { transfer: [imageData.data.buffer] })
+    const { detections, _transfer } = await detectObject({
+      imageDataBuffer: imageData.data.buffer,
+      modelUrl: selectedDetectionModel.value,
+    }, { transfer: [imageData.data.buffer] })
 
     canvasCtx.clearRect(0, 0, modelSize.value, modelSize.value)
     canvasCtx.putImageData(new ImageData(new Uint8ClampedArray(_transfer[0]), vncCanvas.value.width, vncCanvas.value.height), 0, 0)
@@ -346,6 +357,22 @@ if (import.meta.hot) {
       </div>
       <div class="text-gray-500 text-sm text-center">
         The playground for the Factorio YOLO v0 model.
+      </div>
+      <div class="flex items-center justify-center gap-2 text-sm">
+        <label for="detection-model" class="text-gray-500">Detection Model</label>
+        <select
+          id="detection-model"
+          v-model="selectedDetectionModel"
+          class="rounded-md border border-input bg-background px-3 py-1.5"
+        >
+          <option
+            v-for="model in detectionModels"
+            :key="model.url"
+            :value="model.url"
+          >
+            {{ model.label }}
+          </option>
+        </select>
       </div>
     </div>
 
