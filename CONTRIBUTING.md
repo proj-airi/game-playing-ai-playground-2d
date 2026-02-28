@@ -4,7 +4,7 @@ Thank you for contributing to this project.
 
 ## Commit Message Convention
 
-Please use the **Conventional Commits** format for commit messages:
+Please use the [**Conventional Commits**](https://www.conventionalcommits.org/en/v1.0.0/) format for commit messages:
 
 ```text
 <type>(<scope>): <subject>
