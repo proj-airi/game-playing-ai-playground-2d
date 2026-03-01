@@ -1,0 +1,7 @@
+# OS / editor
+.DS_Store
+.envrc
+
+node_modules/
+
+*.local.code-workspace
