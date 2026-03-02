@@ -6,10 +6,6 @@ import * as ort from 'onnxruntime-web'
 import type { ObjectDetectionRequest } from '~/events/object-detection'
 import { objectDetectionInvoke } from '~/events/object-detection'
 
-const hfModelRepo = 'proj-airi/factorio-yolo-v0'
-const hfModelPath = 'results/weights/best.onnx'
-const hfModelUrl = `https://huggingface.co/${hfModelRepo}/resolve/main/${hfModelPath}?download=true`
-
 const { context } = createContext()
 
 const numClasses = 6
@@ -156,7 +152,7 @@ async function detectImageData({ imageDataBuffer, modelUrl }: ObjectDetectionReq
   }
   // #endregion
 
-  const targetModelUrl = modelUrl || hfModelUrl
+  const targetModelUrl = modelUrl
   if (!session || loadedModelUrl !== targetModelUrl) {
     session = await ort.InferenceSession.create(targetModelUrl, {
       executionProviders: ['webgpu', 'wasm'],

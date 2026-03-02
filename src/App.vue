@@ -9,6 +9,7 @@ import { computed, onUnmounted, ref, useTemplateRef } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button as TheButton } from '~/components/ui/button'
 import { Input as TheInput } from '~/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { isDark, toggleDark } from '~/composables/dark'
 import DetectWorker from '~/workers/detect-worker?worker'
@@ -30,10 +31,11 @@ const names = ref([
 
 const detectionModels = [
   {
-    label: 'Factorio YOLO v0 (Hugging Face)',
-    url: 'https://huggingface.co/proj-airi/factorio-yolo-v0/resolve/main/results/weights/best.onnx?download=true',
+    label: 'Factorio YOLO v0',
+    url: 'https://huggingface.co/proj-airi/factorio-yolo-v0/resolve/main/best.onnx',
   },
 ] as const
+const defaultImageUrl = 'https://huggingface.co/datasets/proj-airi/factorio-yolo-dataset-v0/resolve/main/examples/demo.jpg'
 
 const objectDetectionContext = createContext(new DetectWorker()).context
 const detectObject = defineInvoke(objectDetectionContext, objectDetectionInvoke)
@@ -41,7 +43,6 @@ const detectObject = defineInvoke(objectDetectionContext, objectDetectionInvoke)
 const loadingVlmModel = ref(false)
 const vlmModelLoaded = ref(false)
 const vlmModelLoadingProgress = ref(0)
-const detectWorkerInstance = new DetectWorker()
 const vlmPlayWorkerContext = createContext(new VlmPlayWorker()).context
 vlmPlayWorkerContext.on(vlmModelLoadingProgressEvent, (progress) => {
   vlmModelLoadingProgress.value = progress.body ?? 0
@@ -76,9 +77,11 @@ function useFps() {
 
 const { fps, updateFps } = useFps()
 
-const tab = useLocalStorage('factorio-yolo-v0-playground/current-tab', 'image')
-const selectedDetectionModel = useLocalStorage('factorio-yolo-v0-playground/detection-model-url', detectionModels[0].url)
-const vncAddress = useLocalStorage('factorio-yolo-v0-playground/vnc-address', 'ws://localhost:5901/websockify')
+const tab = useLocalStorage('game-playing-ai-playground-2d/current-tab', 'image')
+const selectedDetectionModel = useLocalStorage('game-playing-ai-playground-2d/detection-model-url', detectionModels[0].url)
+const imageUrl = useLocalStorage('game-playing-ai-playground-2d/image-url', defaultImageUrl)
+const loadingImageFromUrl = ref(false)
+const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 'ws://localhost:5901/websockify')
 const vncView = useTemplateRef<HTMLDivElement>('vncView')
 const vncClient = ref<NoVncClient | null>(null)
 const vncCanvas = ref<HTMLCanvasElement | null>(null)
@@ -147,8 +150,21 @@ async function detectBlob(blob: Blob) {
   const dy = (modelSize.value - newHeight) / 2
   imgCtx.drawImage(imageEl, dx, dy, newWidth, newHeight)
 
-  const imageData = imgCtx.getImageData(dx, dy, modelSize.value, modelSize.value)
-  detectWorkerInstance.postMessage({ imageData, modelUrl: selectedDetectionModel.value })
+  try {
+    const imageData = imgCtx.getImageData(0, 0, modelSize.value, modelSize.value)
+    const { detections, _transfer } = await detectObject({
+      imageDataBuffer: imageData.data.buffer,
+      modelUrl: selectedDetectionModel.value,
+    }, { transfer: [imageData.data.buffer] })
+
+    imgCtx.putImageData(new ImageData(new Uint8ClampedArray(_transfer[0]), modelSize.value, modelSize.value), 0, 0)
+    drawDetections(detections)
+  }
+  catch (error) {
+    console.error(error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    toast.error(`Failed to run detection: ${errorMessage}`)
+  }
 }
 
 async function onFileChange(file: File) {
@@ -158,6 +174,60 @@ async function onFileChange(file: File) {
   }
 
   detectBlob(file)
+}
+
+async function onLoadImageFromUrlBtnClick() {
+  const targetUrl = imageUrl.value.trim()
+  if (!targetUrl) {
+    toast.error('Please input an image URL')
+    return
+  }
+
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(targetUrl)
+  }
+  catch {
+    toast.error('Invalid URL')
+    return
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    toast.error('Only http(s) URLs are supported')
+    return
+  }
+
+  loadingImageFromUrl.value = true
+
+  try {
+    const response = await fetch(parsedUrl.toString())
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+
+    const contentType = response.headers.get('content-type')
+    if (contentType && !contentType.startsWith('image/')) {
+      throw new Error(`URL returned non-image content (${contentType})`)
+    }
+
+    const blob = await response.blob()
+    if (!blob.type.startsWith('image/')) {
+      throw new Error(`URL returned non-image blob (${blob.type || 'unknown type'})`)
+    }
+
+    await detectBlob(blob)
+  }
+  catch (error) {
+    console.error(error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const corsHint = errorMessage.includes('Failed to fetch')
+      ? ' (the remote server may block CORS)'
+      : ''
+    toast.error(`Failed to load image URL: ${errorMessage}${corsHint}`)
+  }
+  finally {
+    loadingImageFromUrl.value = false
+  }
 }
 
 const fileDialog = useFileDialog({
@@ -353,26 +423,30 @@ if (import.meta.hot) {
   <div class="w-full h-full flex flex-col justify-center items-center">
     <div class="flex flex-col gap-2 mb-8">
       <div class="text-3xl font-bold text-center">
-        Factorio YOLO v0
+        Game Playing AI Playground 2D
       </div>
       <div class="text-gray-500 text-sm text-center">
-        The playground for the Factorio YOLO v0 model.
+        The playground for the game playing AI.
       </div>
       <div class="flex items-center justify-center gap-2 text-sm">
         <label for="detection-model" class="text-gray-500">Detection Model</label>
-        <select
-          id="detection-model"
+        <Select
           v-model="selectedDetectionModel"
-          class="rounded-md border border-input bg-background px-3 py-1.5"
+          name="detection-model"
         >
-          <option
-            v-for="model in detectionModels"
-            :key="model.url"
-            :value="model.url"
-          >
-            {{ model.label }}
-          </option>
-        </select>
+          <SelectTrigger id="detection-model" class="w-72">
+            <SelectValue placeholder="Select a detection model" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="model in detectionModels"
+              :key="model.url"
+              :value="model.url"
+            >
+              {{ model.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
 
@@ -394,6 +468,15 @@ if (import.meta.hot) {
         </TabsList>
       </div>
       <TabsContent value="image">
+        <form flex gap-2 mb-2 @submit.prevent="onLoadImageFromUrlBtnClick">
+          <TheInput
+            v-model="imageUrl"
+            placeholder="https://huggingface.co/datasets/proj-airi/factorio-yolo-dataset-v0/resolve/main/examples/demo.jpg"
+          />
+          <TheButton type="submit" variant="outline" :disabled="loadingImageFromUrl">
+            {{ loadingImageFromUrl ? 'Loading...' : 'Load URL' }}
+          </TheButton>
+        </form>
         <div
           w="80 md:120 lg:160"
           h="80 md:120 lg:160" overflow-hidden rounded-lg
@@ -493,7 +576,7 @@ if (import.meta.hot) {
           <TheButton v-else variant="outline" @click="onConnectVncBtnClick">
             Connect
           </TheButton>
-          <TheButton variant="outline" as="a" size="icon" px-2 href="https://github.com/moeru-ai/airi-factorio/tree/main/apps/factorio-yolo-v0-playground/README.md" target="_blank">
+          <TheButton variant="outline" as="a" size="icon" px-2 href="https://github.com/proj-airi/game-playing-ai-playground-2d#2d-game-playing-ai-playgroundwip" target="_blank">
             <span i-solar-question-circle-bold text-xl />
           </TheButton>
         </div>
@@ -533,8 +616,8 @@ if (import.meta.hot) {
     <div class="flex gap-4 text-gray-500 text-lg">
       <div v-if="isDark" cursor-pointer i-solar-cloudy-moon-bold-duotone @click="toggleDark()" />
       <div v-else cursor-pointer i-solar-sun-2-bold @click="toggleDark()" />
-      <a i-carbon-logo-github href="https://github.com/moeru-ai/airi-factorio/tree/main/models/factorio-yolo-v0" target="_blank" />
-      <a i-simple-icons-huggingface href="https://huggingface.co/spaces/proj-airi/factorio-yolo-v0-playground" target="_blank" />
+      <a i-carbon-logo-github href="https://github.com/proj-airi/game-playing-ai-playground-2d" target="_blank" />
+      <a i-simple-icons-huggingface href="https://huggingface.co/spaces/proj-airi/game-playing-ai-playground-2d" target="_blank" />
     </div>
   </div>
 </template>

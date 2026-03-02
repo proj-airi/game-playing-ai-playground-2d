@@ -35,7 +35,7 @@ export default defineConfig({
     LFS(),
     SpaceCard({
       root: cwd(),
-      title: 'Factorio YOLO v0 Playground',
+      title: 'Game Playing AI Playground 2D',
       emoji: '🎮',
       colorFrom: 'yellow',
       colorTo: 'red',
@@ -44,7 +44,7 @@ export default defineConfig({
       license: 'mit',
       models: ['Ultralytics/YOLO11'], // TODO: replace with uploaded model
       // eslint-disable-next-line ts/naming-convention
-      short_description: 'The playground for the Factorio YOLO v0 model.',
+      short_description: 'The playground for the game playing AI.',
       thumbnail: 'https://raw.githubusercontent.com/moeru-ai/airi-factorio/refs/heads/main/models/factorio-yolo-v0/assets/thumbnail.jpeg',
     }),
   ],
