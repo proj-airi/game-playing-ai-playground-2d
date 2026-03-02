@@ -3,8 +3,8 @@ import type { Detection } from '~/types'
 import { defineInvokeHandler } from '@unbird/eventa'
 import { createContext } from '@unbird/eventa/adapters/webworkers/worker'
 import * as ort from 'onnxruntime-web'
+import type { ObjectDetectionRequest } from '~/events/object-detection'
 import { objectDetectionInvoke } from '~/events/object-detection'
-import model from '../../../../models/factorio-yolo-v0/results/weights/best.onnx'
 
 const { context } = createContext()
 
@@ -12,6 +12,7 @@ const numClasses = 6
 const confidenceThreshold = 0.6
 const modelSize = 640
 let session: ort.InferenceSession | null = null
+let loadedModelUrl: string | null = null
 
 function iou(box1: Detection, box2: Detection): number {
   // Early exit: check if boxes are completely separate (no overlap)
@@ -132,7 +133,7 @@ function generateInv255Lut() {
 
 const INV255_LUT = generateInv255Lut()
 
-async function detectImageData(imageDataBuffer: ArrayBuffer) {
+async function detectImageData({ imageDataBuffer, modelUrl }: ObjectDetectionRequest) {
   const imageData = new Uint8ClampedArray(imageDataBuffer)
   // #region thanks to cursor!
   const totalPixels = modelSize * modelSize
@@ -151,8 +152,12 @@ async function detectImageData(imageDataBuffer: ArrayBuffer) {
   }
   // #endregion
 
-  if (!session) {
-    session = await ort.InferenceSession.create(model, { executionProviders: ['webgpu', 'wasm'] })
+  const targetModelUrl = modelUrl
+  if (!session || loadedModelUrl !== targetModelUrl) {
+    session = await ort.InferenceSession.create(targetModelUrl, {
+      executionProviders: ['webgpu', 'wasm'],
+    })
+    loadedModelUrl = targetModelUrl
   }
 
   const imageTensor = new ort.Tensor('float32', imageDataNormalized, [1, 3, modelSize, modelSize])

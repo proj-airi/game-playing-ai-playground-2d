@@ -1,3 +1,6 @@
+// TODO: migrate it later
+// @ts-nocheck
+
 import type { LlavaProcessor, PreTrainedModel, PreTrainedTokenizer } from '@huggingface/transformers'
 import { AutoModelForImageTextToText, AutoProcessor, RawImage } from '@huggingface/transformers'
 import { defineInvokeHandler } from '@unbird/eventa'
