@@ -6,10 +6,6 @@ import PreviewBox from '~/components/PreviewBox.vue'
 import { Button as TheButton } from '~/components/ui/button'
 import { Input as TheInput } from '~/components/ui/input'
 
-const imageUrl = defineModel<string>('imageUrl', {
-  required: true,
-})
-
 const props = defineProps<{
   loadingImageFromUrl: boolean
   modelSize: number
@@ -18,6 +14,10 @@ const props = defineProps<{
   detectBlob: (blob: Blob, canvas: HTMLCanvasElement | null, modelUrl: string) => Promise<void>
   loadImageFromUrl: (url: string, canvas: HTMLCanvasElement | null, modelUrl: string) => Promise<void>
 }>()
+
+const imageUrl = defineModel<string>('imageUrl', {
+  required: true,
+})
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const fileDialog = useFileDialog({

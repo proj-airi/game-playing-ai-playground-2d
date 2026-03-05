@@ -1,4 +1,5 @@
 // TODO: migrate it later
+// eslint-disable-next-line ts/ban-ts-comment
 // @ts-nocheck
 
 import type { LlavaProcessor, PreTrainedModel, PreTrainedTokenizer } from '@huggingface/transformers'

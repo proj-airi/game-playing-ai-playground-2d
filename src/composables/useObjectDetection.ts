@@ -3,8 +3,8 @@ import { defineInvoke } from '@unbird/eventa'
 import { createContext } from '@unbird/eventa/adapters/webworkers'
 import { onUnmounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import DetectWorker from '~/workers/detect-worker?worker'
 import { objectDetectionInvoke } from '~/events/object-detection'
+import DetectWorker from '~/workers/detect-worker?worker'
 
 export function useObjectDetection() {
   const detectionModels = [

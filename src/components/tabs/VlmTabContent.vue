@@ -9,13 +9,13 @@ import { Input as TheInput } from '~/components/ui/input'
 import { useAnimationFrameTask } from '~/composables/useAnimationFrameTask'
 import { useVlm } from '~/composables/useVlm'
 
-const vncAddress = defineModel<string>('vncAddress', {
-  required: true,
-})
-
 const props = defineProps<{
   isActive: boolean
 }>()
+
+const vncAddress = defineModel<string>('vncAddress', {
+  required: true,
+})
 
 const vncViewRef = ref<HTMLDivElement | null>(null)
 const vncClient = ref<NoVncClient | null>(null)

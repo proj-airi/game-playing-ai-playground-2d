@@ -1,9 +1,9 @@
-import type { Detection } from '~/types'
+import type { ObjectDetectionRequest } from '~/events/object-detection'
 
+import type { Detection } from '~/types'
 import { defineInvokeHandler } from '@unbird/eventa'
 import { createContext } from '@unbird/eventa/adapters/webworkers/worker'
 import * as ort from 'onnxruntime-web'
-import type { ObjectDetectionRequest } from '~/events/object-detection'
 import { objectDetectionInvoke } from '~/events/object-detection'
 
 const { context } = createContext()

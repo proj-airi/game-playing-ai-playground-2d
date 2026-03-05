@@ -9,7 +9,7 @@ import VueDevTools from 'vite-plugin-vue-devtools'
 export default defineConfig({
   resolve: {
     alias: {
-      // eslint-disable-next-line ts/naming-convention
+
       '~/': `${path.resolve(__dirname, 'src')}/`,
     },
   },
@@ -43,7 +43,7 @@ export default defineConfig({
       pinned: false,
       license: 'mit',
       models: ['Ultralytics/YOLO11'], // TODO: replace with uploaded model
-      // eslint-disable-next-line ts/naming-convention
+
       short_description: 'The playground for the game playing AI.',
       thumbnail: 'https://raw.githubusercontent.com/moeru-ai/airi-factorio/refs/heads/main/models/factorio-yolo-v0/assets/thumbnail.jpeg',
     }),

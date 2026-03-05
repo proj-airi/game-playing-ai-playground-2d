@@ -1,8 +1,8 @@
 import { defineInvoke } from '@unbird/eventa'
 import { createContext } from '@unbird/eventa/adapters/webworkers'
 import { ref } from 'vue'
-import VlmPlayWorker from '~/workers/vlm-play-worker?worker'
 import { vlmGenerateInvoke, vlmLoadModelInvoke, vlmModelLoadingProgressEvent } from '~/events/vlm-play-worker'
+import VlmPlayWorker from '~/workers/vlm-play-worker?worker'
 
 export function useVlm() {
   const loadingVlmModel = ref(false)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Detection } from '~/types'
 import type { ComponentPublicInstance } from 'vue'
+import type { Detection } from '~/types'
 import NoVncClient from '@novnc/novnc/lib/rfb'
 import { onUnmounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
@@ -10,10 +10,6 @@ import { Input as TheInput } from '~/components/ui/input'
 import { useAnimationFrameTask } from '~/composables/useAnimationFrameTask'
 import { useFps } from '~/composables/useFps'
 
-const vncAddress = defineModel<string>('vncAddress', {
-  required: true,
-})
-
 const props = defineProps<{
   modelSize: number
   selectedDetectionModel: string
@@ -21,6 +17,10 @@ const props = defineProps<{
   detectImageData: (imageDataBuffer: ArrayBuffer, modelUrl: string) => Promise<{ detections: Detection[], _transfer: ArrayBuffer[] }>
   drawDetections: (ctx: CanvasRenderingContext2D, detections: Detection[]) => void
 }>()
+
+const vncAddress = defineModel<string>('vncAddress', {
+  required: true,
+})
 
 const vncViewRef = ref<HTMLDivElement | null>(null)
 const resultCanvasRef = ref<HTMLCanvasElement | null>(null)
