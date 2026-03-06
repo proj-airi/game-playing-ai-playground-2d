@@ -7,6 +7,7 @@ import { Button as TheButton } from '~/components/ui/button'
 import { Input as TheInput } from '~/components/ui/input'
 
 const props = defineProps<{
+  currentDefaultImageUrl: string
   loadingImageFromUrl: boolean
   modelSize: number
   hasImage: boolean
@@ -56,7 +57,7 @@ async function onLoadImageFromUrl() {
   <form flex gap-2 mb-2 @submit.prevent="onLoadImageFromUrl">
     <TheInput
       v-model="imageUrl"
-      placeholder="https://huggingface.co/datasets/proj-airi/factorio-yolo-dataset-v0/resolve/main/examples/demo.jpg"
+      :placeholder="currentDefaultImageUrl"
     />
     <TheButton type="submit" variant="outline" :disabled="loadingImageFromUrl">
       {{ loadingImageFromUrl ? 'Loading...' : 'Load URL' }}

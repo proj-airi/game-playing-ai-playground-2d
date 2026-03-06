@@ -1,31 +1,139 @@
 import type { Detection } from '~/types'
 import { defineInvoke } from '@unbird/eventa'
 import { createContext } from '@unbird/eventa/adapters/webworkers'
-import { onUnmounted, ref } from 'vue'
+import { computedAsync, useLocalStorage } from '@vueuse/core'
+import { computed, onUnmounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { parse as parseYaml } from 'yaml'
 import { objectDetectionInvoke } from '~/events/object-detection'
 import DetectWorker from '~/workers/detect-worker?worker'
 
-export function useObjectDetection() {
-  const detectionModels = [
-    {
-      label: 'Factorio YOLO v0',
-      url: 'https://huggingface.co/proj-airi/factorio-yolo-v0/resolve/main/best.onnx',
-    },
-  ] as const
+interface DetectionModel {
+  label: string
+  modelName: string
+  version: string
+  revision: string
+}
 
-  const defaultImageUrl = 'https://huggingface.co/datasets/proj-airi/factorio-yolo-dataset-v0/resolve/main/examples/demo.jpg'
-  const names = [
-    'assembling-machine-1',
-    'assembling-machine-2',
-    'assembling-machine-3',
-    'transport-belt',
-    'fast-transport-belt',
-    'express-transport-belt',
-  ]
+interface DetectionConfig {
+  names: string[]
+}
+
+interface PlaygroundConfig {
+  dataset_revision: string
+  input_size?: number
+}
+
+function buildModelRepoId(modelName: string, version: string) {
+  return `proj-airi/${modelName}-${version}`
+}
+
+function buildDatasetRepoId(modelName: string, version: string) {
+  return `proj-airi/${modelName}-dataset-${version}`
+}
+
+function buildModelUrl(repoId: string, revision: string) {
+  return `https://huggingface.co/${repoId}/resolve/${revision}/best.onnx`
+}
+
+function buildModelCardUrl(repoId: string, revision: string) {
+  return `https://huggingface.co/${repoId}/resolve/${revision}/README.md`
+}
+
+function buildDatasetDetectUrl(datasetRepo: string, datasetRevision: string) {
+  return `https://huggingface.co/datasets/${datasetRepo}/resolve/${datasetRevision}/detect.yaml`
+}
+
+function buildDefaultImageUrl(datasetRepo: string, datasetRevision: string) {
+  return `https://huggingface.co/datasets/${datasetRepo}/resolve/${datasetRevision}/examples/demo.jpg`
+}
+
+function extractFrontmatter(content: string) {
+  const lines = content.split(/\r?\n/)
+  if (lines[0]?.trim() !== '---') {
+    throw new Error('Model card frontmatter is missing')
+  }
+
+  const closingIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---')
+  if (closingIndex === -1) {
+    throw new Error('Model card frontmatter closing marker is missing')
+  }
+
+  return lines.slice(1, closingIndex).join('\n')
+}
+
+function toPositiveInteger(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value)
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed
+    }
+  }
+
+  return undefined
+}
+
+function parsePlaygroundConfig(frontmatter: string): PlaygroundConfig {
+  const parsed = parseYaml(frontmatter) as Record<string, unknown> | null
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Model card frontmatter is invalid YAML')
+  }
+
+  const playground = parsed.playground
+  if (!playground || typeof playground !== 'object') {
+    throw new Error('playground section is missing in model card frontmatter')
+  }
+
+  const config = playground as Record<string, unknown>
+  const datasetRevision = typeof config.dataset_revision === 'string' ? config.dataset_revision : ''
+
+  if (!datasetRevision) {
+    throw new Error('playground.dataset_revision is missing')
+  }
+
+  return {
+    dataset_revision: datasetRevision,
+    input_size: toPositiveInteger(config.input_size ?? config.image_size),
+  }
+}
+
+function parseNamesFromDetectYml(content: string) {
+  const parsed = parseYaml(content) as Record<string, unknown> | null
+  const namesValue = parsed?.names as { [i: number]: string }
+  if (!namesValue) {
+    throw new Error('names section is missing in detect.yml')
+  }
+
+  return Object.values(namesValue)
+}
+
+export const detectionModels: DetectionModel[] = [
+  { label: 'Factorio YOLO v0', modelName: 'factorio-yolo', version: 'v0', revision: 'main' },
+]
+
+export function useObjectDetection() {
+  const currentModel = useLocalStorage('game-playing-ai-playground-2d/detection-model', detectionModels[0])
+  const currentPlaygroundConfig = computedAsync(async () => {
+    const modelCard = await fetchText(buildModelCardUrl(buildModelRepoId(currentModel.value.modelName, currentModel.value.version), currentModel.value.revision))
+    const frontmatter = extractFrontmatter(modelCard)
+    return parsePlaygroundConfig(frontmatter)
+  })
+  const currentDetectionConfig = computedAsync<DetectionConfig>(async () => {
+    if (!currentPlaygroundConfig.value) {
+      return { names: [] }
+    }
+    const detectYml = await fetchText(buildDatasetDetectUrl(buildDatasetRepoId(currentModel.value.modelName, currentModel.value.version), currentPlaygroundConfig.value.dataset_revision))
+    return { names: parseNamesFromDetectYml(detectYml) }
+  })
+  const currentInputSize = computed(() => currentPlaygroundConfig.value?.input_size ?? 640)
+  const currentModelUrl = computed(() => buildModelUrl(buildModelRepoId(currentModel.value.modelName, currentModel.value.version), currentModel.value.revision))
+  const currentDefaultImageUrl = computed(() => buildDefaultImageUrl(buildDatasetRepoId(currentModel.value.modelName, currentModel.value.version), currentPlaygroundConfig.value?.dataset_revision ?? 'main'))
 
   const objectUrls = ref<string[]>([])
-  const modelSize = ref(640)
   const loadingImageFromUrl = ref(false)
 
   const objectDetectionContext = createContext(new DetectWorker()).context
@@ -39,6 +147,14 @@ export function useObjectDetection() {
   onUnmounted(() => {
     cleanupObjectUrls()
   })
+
+  async function fetchText(url: string) {
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status} (${url})`)
+    }
+    return response.text()
+  }
 
   function processSize(width: number, height: number, maxSize: number): [number, number] {
     if (width > height) {
@@ -64,23 +180,28 @@ export function useObjectDetection() {
     ctx.lineWidth = 2
 
     for (const detection of detections) {
-      const className = names[detection.classId] ?? `class-${detection.classId}`
+      const className = currentDetectionConfig.value!.names[detection.classId]
       ctx.strokeRect(detection.topLeftX, detection.topLeftY, detection.bottomRightX - detection.topLeftX, detection.bottomRightY - detection.topLeftY)
       ctx.fillText(`${className}: ${detection.confidence.toFixed(2)}`, detection.topLeftX, detection.topLeftY)
     }
   }
 
-  async function detectImageData(imageDataBuffer: ArrayBuffer, modelUrl: string) {
+  async function detectImageData(imageDataBuffer: ArrayBuffer, size: number) {
+    if (!currentDetectionConfig.value) {
+      throw new Error('Detection config is not loaded')
+    }
+
     return detectObject({
       imageDataBuffer,
-      modelUrl,
+      modelUrl: currentModelUrl.value,
+      modelSize: size,
+      outputNumClasses: currentDetectionConfig.value!.names.length,
     }, { transfer: [imageDataBuffer] })
   }
 
-  async function detectBlob(blob: Blob, canvas: HTMLCanvasElement | null, modelUrl: string) {
-    if (!canvas) {
-      toast.error('Failed to get canvas element')
-      return
+  async function detectBlob(blob: Blob, canvas: HTMLCanvasElement | null) {
+    if (!canvas || !currentDetectionConfig.value) {
+      throw new Error('Failed to get canvas element or detection config')
     }
 
     const img = await createImageBitmap(blob)
@@ -89,7 +210,7 @@ export function useObjectDetection() {
     objectUrls.value.push(imageEl.src)
     await waitForImageLoad(imageEl)
 
-    const [newWidth, newHeight] = processSize(img.width, img.height, modelSize.value)
+    const [newWidth, newHeight] = processSize(img.width, img.height, currentInputSize.value)
     imageEl.width = newWidth
     imageEl.height = newHeight
 
@@ -99,18 +220,18 @@ export function useObjectDetection() {
       return
     }
 
-    ctx.clearRect(0, 0, modelSize.value, modelSize.value)
+    ctx.clearRect(0, 0, currentInputSize.value, currentInputSize.value)
     ctx.fillStyle = 'rgb(114, 114, 114)'
-    ctx.fillRect(0, 0, modelSize.value, modelSize.value)
+    ctx.fillRect(0, 0, currentInputSize.value, currentInputSize.value)
 
-    const dx = (modelSize.value - newWidth) / 2
-    const dy = (modelSize.value - newHeight) / 2
+    const dx = (currentInputSize.value - newWidth) / 2
+    const dy = (currentInputSize.value - newHeight) / 2
     ctx.drawImage(imageEl, dx, dy, newWidth, newHeight)
 
     try {
-      const imageData = ctx.getImageData(0, 0, modelSize.value, modelSize.value)
-      const { detections, _transfer } = await detectImageData(imageData.data.buffer, modelUrl)
-      ctx.putImageData(new ImageData(new Uint8ClampedArray(_transfer[0]), modelSize.value, modelSize.value), 0, 0)
+      const imageData = ctx.getImageData(0, 0, currentInputSize.value, currentInputSize.value)
+      const { detections, _transfer } = await detectImageData(imageData.data.buffer, currentInputSize.value)
+      ctx.putImageData(new ImageData(new Uint8ClampedArray(_transfer[0]), currentInputSize.value, currentInputSize.value), 0, 0)
       drawDetections(ctx, detections)
     }
     catch (error) {
@@ -120,7 +241,7 @@ export function useObjectDetection() {
     }
   }
 
-  async function loadImageFromUrl(url: string, canvas: HTMLCanvasElement | null, modelUrl: string) {
+  async function loadImageFromUrl(url: string, canvas: HTMLCanvasElement | null) {
     const targetUrl = url.trim()
     if (!targetUrl) {
       toast.error('Please input an image URL')
@@ -159,7 +280,7 @@ export function useObjectDetection() {
         throw new Error(`URL returned non-image blob (${blob.type || 'unknown type'})`)
       }
 
-      await detectBlob(blob, canvas, modelUrl)
+      await detectBlob(blob, canvas)
     }
     catch (error) {
       console.error(error)
@@ -176,8 +297,11 @@ export function useObjectDetection() {
 
   return {
     detectionModels,
-    defaultImageUrl,
-    modelSize,
+    currentModel,
+    currentDetectionConfig,
+    currentDefaultImageUrl,
+    currentPlaygroundConfig,
+    currentInputSize,
     objectUrls,
     loadingImageFromUrl,
     drawDetections,

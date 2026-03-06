@@ -8,9 +8,7 @@ import { objectDetectionInvoke } from '~/events/object-detection'
 
 const { context } = createContext()
 
-const numClasses = 6
 const confidenceThreshold = 0.6
-const modelSize = 640
 let session: ort.InferenceSession | null = null
 let loadedModelUrl: string | null = null
 
@@ -39,7 +37,7 @@ function iou(box1: Detection, box2: Detection): number {
   return intersectionArea / unionArea
 }
 
-function processOutput(outputData: Float32Array, numCandidates: number) {
+function processOutput(outputData: Float32Array, numCandidates: number, numClasses: number) {
   const detections: Detection[] = []
 
   // Pre-calculate array offsets to avoid repeated multiplication
@@ -133,7 +131,12 @@ function generateInv255Lut() {
 
 const INV255_LUT = generateInv255Lut()
 
-async function detectImageData({ imageDataBuffer, modelUrl }: ObjectDetectionRequest) {
+async function detectImageData({
+  imageDataBuffer,
+  modelUrl,
+  modelSize,
+  outputNumClasses,
+}: ObjectDetectionRequest) {
   const imageData = new Uint8ClampedArray(imageDataBuffer)
   // #region thanks to cursor!
   const totalPixels = modelSize * modelSize
@@ -166,7 +169,7 @@ async function detectImageData({ imageDataBuffer, modelUrl }: ObjectDetectionReq
 
   const outputData = output0.data as Float32Array
 
-  const detections = processOutput(outputData, output0.dims[2])
+  const detections = processOutput(outputData, output0.dims[2], outputNumClasses)
 
   return { detections, _transfer: [imageDataBuffer] }
 }

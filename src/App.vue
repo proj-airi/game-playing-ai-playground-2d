@@ -6,12 +6,13 @@ import VncTabContent from '~/components/tabs/VncTabContent.vue'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { isDark, toggleDark } from '~/composables/dark'
-import { useObjectDetection } from '~/composables/useObjectDetection'
+import { detectionModels, useObjectDetection } from '~/composables/useObjectDetection'
 
 const {
-  detectionModels,
-  defaultImageUrl,
-  modelSize,
+  currentModel,
+  currentDefaultImageUrl,
+  currentDetectionConfig,
+  currentInputSize,
   objectUrls,
   loadingImageFromUrl,
   drawDetections,
@@ -21,8 +22,7 @@ const {
 } = useObjectDetection()
 
 const tab = useLocalStorage('game-playing-ai-playground-2d/current-tab', 'image')
-const selectedDetectionModel = useLocalStorage('game-playing-ai-playground-2d/detection-model-url', detectionModels[0].url)
-const imageUrl = useLocalStorage('game-playing-ai-playground-2d/image-url', defaultImageUrl)
+const imageUrl = useLocalStorage('game-playing-ai-playground-2d/image-url', currentDefaultImageUrl.value)
 const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 'ws://localhost:5901/websockify')
 
 // TODO: Move cross-tab detection dependencies to Pinia to avoid passing function props through App.vue.
@@ -40,7 +40,7 @@ const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 
       <div class="flex items-center justify-center gap-2 text-sm">
         <label for="detection-model" class="text-gray-500">Detection Model</label>
         <Select
-          v-model="selectedDetectionModel"
+          v-model="currentModel.modelName"
           name="detection-model"
         >
           <SelectTrigger id="detection-model" class="w-72">
@@ -49,8 +49,8 @@ const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 
           <SelectContent>
             <SelectItem
               v-for="model in detectionModels"
-              :key="model.url"
-              :value="model.url"
+              :key="model.modelName"
+              :value="model.modelName"
             >
               {{ model.label }}
             </SelectItem>
@@ -59,7 +59,7 @@ const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 
       </div>
     </div>
 
-    <Tabs v-model="tab" default-value="image">
+    <Tabs v-model="tab" :disabled="!currentDetectionConfig" default-value="image">
       <div w-full flex justify-center>
         <TabsList mx-auto>
           <TabsTrigger value="image">
@@ -79,10 +79,11 @@ const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 
       <TabsContent value="image">
         <ImageTabContent
           v-model:image-url="imageUrl"
+          :current-default-image-url="currentDefaultImageUrl"
           :loading-image-from-url="loadingImageFromUrl"
-          :model-size="modelSize"
+          :model-size="currentInputSize"
           :has-image="objectUrls.length > 0"
-          :selected-detection-model="selectedDetectionModel"
+          :selected-detection-model="currentModel.modelName"
           :detect-blob="detectBlob"
           :load-image-from-url="loadImageFromUrl"
         />
@@ -93,8 +94,8 @@ const vncAddress = useLocalStorage('game-playing-ai-playground-2d/vnc-address', 
       <TabsContent value="vnc">
         <VncTabContent
           v-model:vnc-address="vncAddress"
-          :model-size="modelSize"
-          :selected-detection-model="selectedDetectionModel"
+          :model-size="currentInputSize"
+          :selected-detection-model="currentModel.modelName"
           :is-active="tab === 'vnc'"
           :detect-image-data="detectImageData"
           :draw-detections="drawDetections"

@@ -4,6 +4,8 @@ import { defineInvokeEventa } from '@unbird/eventa'
 export interface ObjectDetectionRequest {
   imageDataBuffer: ArrayBuffer
   modelUrl: string
+  modelSize: number
+  outputNumClasses: number
 }
 
 export const objectDetectionInvoke = defineInvokeEventa<

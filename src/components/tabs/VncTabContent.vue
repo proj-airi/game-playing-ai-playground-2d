@@ -14,7 +14,7 @@ const props = defineProps<{
   modelSize: number
   selectedDetectionModel: string
   isActive: boolean
-  detectImageData: (imageDataBuffer: ArrayBuffer, modelUrl: string) => Promise<{ detections: Detection[], _transfer: ArrayBuffer[] }>
+  detectImageData: (imageDataBuffer: ArrayBuffer, size: number) => Promise<{ detections: Detection[], _transfer: ArrayBuffer[] }>
   drawDetections: (ctx: CanvasRenderingContext2D, detections: Detection[]) => void
 }>()
 
@@ -55,7 +55,7 @@ const detectTask = useAnimationFrameTask(async () => {
   }
 
   const imageData = sourceCtx.getImageData(0, 0, vncCanvas.value.width, vncCanvas.value.height)
-  const { detections, _transfer } = await props.detectImageData(imageData.data.buffer, props.selectedDetectionModel)
+  const { detections, _transfer } = await props.detectImageData(imageData.data.buffer, props.modelSize)
 
   resultCtx.clearRect(0, 0, props.modelSize, props.modelSize)
   resultCtx.putImageData(new ImageData(new Uint8ClampedArray(_transfer[0]), vncCanvas.value.width, vncCanvas.value.height), 0, 0)
